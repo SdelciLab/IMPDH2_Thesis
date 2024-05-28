@@ -1,0 +1,47 @@
+---
+title: "CD_yHax"
+author: "Alisa Schmidt"
+date: "13.05.24"
+output:
+  html_document:
+    df_print: paged
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggpubr)
+library(ggplot2)
+```
+Number of gH2AX foci (column of interest column R: full nuclei - Number of Spots):
+B3B4B5: WT-empty
+C3C4C5: KO-empty
+D3D4D5: KO-WT
+E3E4E5: KO-CD
+*load the data*
+```{r}
+data <- read.delim("/Users/alisc/Desktop/CRG/final_figures/KO-CD_plate/Objects_Population - full nuclei.txt", skip = 9)
+
+data$Cell <- NA
+data[data$Row == 2, "Cell"] <- "WT-empty"
+data[data$Row == 3, "Cell"] <- "KO-empty"
+data[data$Row == 4, "Cell"] <- "KO-WT"
+data[data$Row == 5, "Cell"] <- "KO-CD"
+data <- data %>% drop_na(Cell)
+data$Cell <- factor(data$Cell, 
+                               levels = c("WT-empty", "KO-empty","KO-WT","KO-CD"))
+my_comparisons <- list(c("WT-empty", "KO-empty"), c("KO-WT","KO-CD"), c("KO-WT","KO-empty"), c("KO-empty","KO-CD"))
+```
+
+*plot γH2AX*
+```{r}
+pdf("/Users/alisc/Desktop/CRG/final_figures/KO-CD_plate/yH2AX.pdf")
+ggplot(data, aes(x = Cell, y =full.nuclei...Number.of.Spots , fill = Cell)) + 
+ geom_boxplot(width = 0.75, fatten = 2)  +
+  labs(x = "", y = "yH2AX foci per nucleus") + theme_classic()+ scale_fill_brewer(palette="Accent") +  theme(legend.position = "none")+   stat_compare_means(comparisons = my_comparisons, method = "wilcox", label = "p.signif")
+
+ggplot(data, aes(x = Cell, y =full.nuclei...Number.of.Spots , fill = Cell)) + 
+ geom_boxplot(width = 0.75, fatten = 2)  +
+  labs(x = "", y = "yH2AX foci per nucleus") + theme_classic()+ scale_fill_brewer(palette="Accent") +  theme(legend.position = "none")
+dev.off()
+```
+

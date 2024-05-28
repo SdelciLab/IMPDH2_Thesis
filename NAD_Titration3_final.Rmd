@@ -1,0 +1,68 @@
+---
+title: "NAD_Titration"
+author: "Alisa Schmidt"
+date: "20.05.2024"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+```
+
+*load data*
+row 2,3,4 ko-nls
+row 5,6,7 ko-wt (only 0 NAD)
+```{r}
+data <- read.delim("/Users/alisc/Desktop/CRG/Operetta/NAD_Titration3/Objects_Population - full nuclei.txt", skip=9)
+data_cond <- data %>%
+    mutate(NAD = case_when(
+        Column == 2 & Row %in% c(5,6,7) ~ "ko-wt",
+        Column == 3 ~ "1000",
+        Column == 4 ~ "800",
+      Column == 5 ~ "400",
+        Column == 6 ~ "200",
+        Column == 7 ~ "100",
+      Column == 8 ~ "50",
+      Column == 9 ~ "25",
+      Column == 10 ~ "12.5",
+      Column == 11 ~ "6.25",
+      Column == 2 ~ "0"))
+
+data_cond$NAD <- factor(data_cond$NAD, levels = c("ko-wt","0","6.25","12.5","25","50","100","200","400","800","1000"))
+
+```
+
+*Filtering*
+```{r}
+
+filtered_data <- data_cond[data_cond$full.nuclei...Nucleus.Roundness>0.8, ]
+filtered_data <- filtered_data[filtered_data$full.nuclei...Nucleus.Area..µm..<300, ]
+stats_data <- filtered_data %>%
+  group_by(NAD) %>%
+  mutate(median_1 = median(full.nuclei...Intensity.Nucleus.Alexa.488.Mean), sd_1 = sd(full.nuclei...Intensity.Nucleus.Alexa.488.Mean))  %>%
+  ungroup()
+
+filtered_data2 <- stats_data %>%
+ dplyr::filter(
+   full.nuclei...Intensity.Nucleus.Alexa.488.Mean >= (median_1 - 5 * sd_1) &
+    full.nuclei...Intensity.Nucleus.Alexa.488.Mean <= (median_1 + 5 * sd_1)
+  )
+removed <- filtered_data2[!filtered_data2$NAD %in% c("ko-wt", "1000"),]
+table(removed$NAD)
+```
+
+*Plot PAR signal*
+```{r}
+pdf("/Users/alisc/Desktop/CRG/final_figures/NAD_Titration_3/PAR_intensity.pdf")
+ggplot(removed, aes(x = NAD, y = full.nuclei...Intensity.Nucleus.Alexa.488.Mean, fill=NAD)) +
+ geom_boxplot(width = 0.75, fatten = 2) +
+  labs(x = "", y = "Intensity Mono/Poly ADP-ribose", fill = "") +
+  theme_classic() + scale_fill_grey(start=1, end=0) +
+  theme( legend.position = "none")
+dev.off()
+```

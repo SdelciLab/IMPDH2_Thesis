@@ -1,0 +1,138 @@
+---
+title: "Progeny_analysis"
+output:
+  html_document:
+    df_print: paged
+---
+**Load libraries**
+```{r Libraries, message=FALSE, warning=FALSE, include=FALSE}
+library(DESeq2)
+library(tidyverse)
+library(EnsDb.Hsapiens.v86)
+library(progeny)
+library(dplyr)
+library(pheatmap)
+library(ggplot2)
+```
+
+*Preparing the data for progeny*
+**Extract the count matrix from the DeSeq object, make gene symbols as row names**
+```{r}
+load("/Users/alisc/Desktop/CRG/DeSeq R/DDS_file_WT_ref.RData")
+rld <- rlog(dds, blind = TRUE)
+rld_counts <- assay(rld)
+#subset for the relevant conditions:
+keep <- c("K0N0G1", "K0N0G2", "K0N0G3", "K0SIG1", "K0SIG2", "K0SIG3", "WT1", "WT2", "WT3")
+hm_counts_subset <- rld_counts[, keep]
+hm_counts_subset <- as.data.frame(hm_counts_subset)
+
+#convert ensemble gene ids to symbols
+ensembl_genenames <- rownames(hm_counts_subset)
+ hgnc_genenames <- ensembldb::select(EnsDb.Hsapiens.v86, keys=ensembl_genenames, keytype="GENEID", columns=c("SYMBOL", "GENEID"))
+  hm_counts_subset$symbol <- hgnc_genenames[match(ensembl_genenames, hgnc_genenames$GENEID), "SYMBOL"] 
+  rownames(hm_counts_subset) <- NULL
+  
+   #problem: duplicated gene symbols
+symbol_counts <- table(hm_counts_subset$symbol)
+non_unique_counts <- symbol_counts[symbol_counts > 1]
+non_unique_counts <- names(non_unique_counts)
+
+averaged_duplicates <- hm_counts_subset %>% 
+  dplyr::filter(symbol %in% non_unique_counts) %>% 
+  group_by(symbol) %>% 
+  summarise(across(everything(), mean)) %>% 
+  unique()
+
+final_data <- hm_counts_subset %>% 
+  dplyr::filter(!symbol %in% non_unique_counts) %>% 
+  rbind(averaged_duplicates) %>% 
+  column_to_rownames(var = "symbol") %>% 
+  as.matrix()
+```
+
+**Progeny analysis**
+```{r}
+# Perform PROGENy calculations
+pathway_output <-progeny(final_data, organism = "Human", scale = T)
+```
+
+**Plot heatmap**
+```{r}
+breaks <- seq(-1, 1, length.out = 255)
+pdf("/Users/alisc/Desktop/CRG/progeny/Progeny_pathways.pdf")
+pheatmap(t(pathway_output),  cluster_cols = F, cluster_rows = T,
+           main= "Progeny_pathways_overview",
+             color = colorRampPalette(c("blue", "white", "red"))(length(breaks) - 1),
+         breaks = breaks)
+dev.off()
+```
+
+*Perform Progeny again with all reconstituted cells*
+
+*Preparing the data for progeny*
+**Extract the count matrix from the DeSeq object, make gene symbols as row names**
+```{r}
+load("/Users/alisc/Desktop/CRG/DeSeq R/DDS_file_WT_ref.RData")
+rld <- rlog(dds, blind = TRUE)
+rld_counts <- assay(rld)
+#subset for the relevant conditions:
+keep <- c("K0N0G1", "K0N0G2", "K0N0G3", "K0NLS1", "K0NLS2", "K0NLS3", "WT1", "WT2", "WT3", "K0SIG1", "K0SIG2", "K0SIG3", "K0WT1", "K0WT2", "K0WT3")
+hm_counts_subset <- rld_counts[, keep]
+hm_counts_subset <- as.data.frame(hm_counts_subset)
+
+#convert ensemble gene ids to symbols
+ensembl_genenames <- rownames(hm_counts_subset)
+ hgnc_genenames <- ensembldb::select(EnsDb.Hsapiens.v86, keys=ensembl_genenames, keytype="GENEID", columns=c("SYMBOL", "GENEID"))
+  hm_counts_subset$symbol <- hgnc_genenames[match(ensembl_genenames, hgnc_genenames$GENEID), "SYMBOL"] 
+  rownames(hm_counts_subset) <- NULL
+  
+   #problem: duplicated gene symbols
+symbol_counts <- table(hm_counts_subset$symbol)
+non_unique_counts <- symbol_counts[symbol_counts > 1]
+non_unique_counts <- names(non_unique_counts)
+
+averaged_duplicates <- hm_counts_subset %>% 
+  dplyr::filter(symbol %in% non_unique_counts) %>% 
+  group_by(symbol) %>% 
+  summarise(across(everything(), mean)) %>% 
+  unique()
+
+final_data <- hm_counts_subset %>% 
+  dplyr::filter(!symbol %in% non_unique_counts) %>% 
+  rbind(averaged_duplicates) %>% 
+  column_to_rownames(var = "symbol") %>% 
+  as.matrix()
+```
+
+**Progeny analysis**
+```{r}
+# Perform PROGENy calculations
+pathway_output <-progeny(final_data, organism = "Human", scale = T)
+death_path <- pathway_output[,c(8,11,12)]
+thesis <- pathway_output[,c(1,3,6,7,8,9,11,12)]
+```
+
+**Plot heatmap**
+```{r}
+breaks <- seq(-1, 1, length.out = 255)
+pdf("/Users/alisc/Desktop/CRG/progeny/Progeny_pathways_death_2.pdf")
+pheatmap(t(death_path),  cluster_cols = F, cluster_rows = T,
+           main= "Progeny_pathways_overview",
+             color = colorRampPalette(c("blue", "white", "red"))(length(breaks) - 1),
+         breaks = breaks)
+dev.off()
+
+pdf("/Users/alisc/Desktop/CRG/progeny/Progeny_pathways_ALLconditions.pdf")
+pheatmap(t(pathway_output),  cluster_cols = F, cluster_rows = T,
+           main= "Progeny_pathways_overview",
+             color = colorRampPalette(c("blue", "white", "red"))(length(breaks) - 1),
+         breaks = breaks)
+dev.off()
+
+pdf("/Users/alisc/Desktop/CRG/progeny/Progeny_pathways_thesiss.pdf")
+pheatmap(t(thesis),  cluster_cols = F, cluster_rows = T,
+           main= "Progeny_pathways_overview",
+             color = colorRampPalette(c("blue", "white", "red"))(length(breaks) - 1),
+         breaks = breaks)
+dev.off()
+```
